@@ -1,0 +1,412 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  telegramId    String   @unique
+  username      String?
+  displayName   String
+  avatarUrl     String?
+  gameUsername  String   @unique
+  level         Int      @default(1)
+  xp            Int      @default(0)
+  rank          String   @default("Bronze")
+  isBanned      Boolean  @default(false)
+  isAdmin       Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastActiveAt  DateTime @default(now())
+
+  wallet            Wallet?
+  sessions          Session[]
+  gameRounds        GameRound[]
+  userPets          UserPet[]
+  inventoryItems    InventoryItem[]
+  purchases         Purchase[]
+  dailyLogins       DailyLogin[]
+  streaks           Streak?
+  userMissions      UserMission[]
+  userAchievements  UserAchievement[]
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+
+  @@index([telegramId])
+  @@index([gameUsername])
+  @@index([createdAt])
+  @@index([level])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+model Wallet {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  coins     Int      @default(0)
+  gems      Int      @default(0)
+  tickets   Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions    WalletTransaction[]
+
+  @@index([userId])
+}
+
+model WalletTransaction {
+  id             String   @id @default(cuid())
+  userId         String
+  type           String
+  amount         Int
+  balanceBefore  Int
+  balanceAfter   Int
+  referenceType  String
+  referenceId    String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet Wallet @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([referenceType, referenceId])
+  @@index([createdAt])
+}
+
+model GameDefinition {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String
+  category    String
+  minBet      Int      @default(100)
+  maxBet      Int      @default(1000000)
+  enabled     Boolean  @default(true)
+  houseEdge   Float    @default(0.6)
+  volatility  String   @default("medium")
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  gameRounds GameRound[]
+
+  @@index([slug])
+  @@index([category])
+  @@index([enabled])
+}
+
+model GameRound {
+  id         String   @id @default(cuid())
+  userId     String
+  gameId     String
+  bet        Int
+  outcome    String
+  payout     Int
+  profit     Int
+  roundId    String   @unique
+  clientSeed String?
+  serverSeed String?
+  createdAt  DateTime @default(now())
+  metadata   Json?
+
+  user User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game GameDefinition @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([gameId])
+  @@index([createdAt])
+}
+
+model Pet {
+  id             String   @id @default(cuid())
+  name           String
+  rarity         String
+  price          Int
+  sellPrice      Int
+  level          Int      @default(1)
+  xp             Int      @default(0)
+  maxLevel       Int      @default(100)
+  passiveEffect  Json?
+  visual         String
+  description    String
+  obtainableFrom String
+  active         Boolean  @default(true)
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  userPets UserPet[]
+
+  @@index([rarity])
+  @@index([price])
+  @@index([active])
+}
+
+model UserPet {
+  id         String   @id @default(cuid())
+  userId     String
+  petId      String
+  level      Int      @default(1)
+  xp         Int      @default(0)
+  equipped   Boolean  @default(false)
+  acquiredAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pet  Pet  @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, petId])
+  @@index([userId])
+  @@index([petId])
+}
+
+model ShopItem {
+  id            String    @id @default(cuid())
+  name          String
+  description   String
+  type          String
+  price         Int
+  currency      String    @default("COIN")
+  rarity        String
+  stock         Int?
+  availability  String    @default("always")
+  purchaseLimit Int?
+  expiresAt     DateTime?
+  enabled       Boolean   @default(true)
+  metadata      Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  purchases Purchase[]
+
+  @@index([type])
+  @@index([enabled])
+  @@index([availability])
+}
+
+model Purchase {
+  id         String   @id @default(cuid())
+  userId     String
+  shopItemId String
+  quantity   Int      @default(1)
+  totalPrice Int
+  currency   String
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shopItem ShopItem @relation(fields: [shopItemId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([shopItemId])
+  @@index([createdAt])
+}
+
+model InventoryItem {
+  id       String   @id @default(cuid())
+  userId   String
+  itemId   String
+  itemType String
+  quantity Int      @default(1)
+  metadata Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, itemId, itemType])
+  @@index([userId])
+  @@index([itemType])
+}
+
+model DailyLogin {
+  id        String   @id @default(cuid())
+  userId    String
+  claimDate DateTime
+  dayNumber Int
+  reward    Json
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, claimDate])
+  @@index([userId])
+  @@index([claimDate])
+}
+
+model Streak {
+  id               String    @id @default(cuid())
+  userId           String    @unique
+  dailyStreak      Int       @default(0)
+  weeklyStreak     Int       @default(0)
+  monthlyStreak    Int       @default(0)
+  bestDailyStreak  Int       @default(0)
+  bestWeeklyStreak Int       @default(0)
+  bestMonthlyStreak Int      @default(0)
+  lastClaimDate    DateTime?
+  lastClaimWeek    DateTime?
+  lastClaimMonth   DateTime?
+  updatedAt        DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Mission {
+  id          String    @id @default(cuid())
+  type        String
+  title       String
+  description String
+  requirement Json
+  reward      Json
+  enabled     Boolean   @default(true)
+  startAt     DateTime?
+  endAt       DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  userMissions UserMission[]
+
+  @@index([type])
+  @@index([enabled])
+}
+
+model UserMission {
+  id          String    @id @default(cuid())
+  userId      String
+  missionId   String
+  progress    Int       @default(0)
+  completed   Boolean   @default(false)
+  claimed     Boolean   @default(false)
+  completedAt DateTime?
+  claimedAt   DateTime?
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, missionId])
+  @@index([userId])
+  @@index([missionId])
+}
+
+model Achievement {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  title       String
+  description String
+  category    String
+  requirement Json
+  reward      Json
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userAchievements UserAchievement[]
+
+  @@index([code])
+  @@index([enabled])
+}
+
+model UserAchievement {
+  id            String    @id @default(cuid())
+  userId        String
+  achievementId String
+  progress      Int       @default(0)
+  completed     Boolean   @default(false)
+  claimed       Boolean   @default(false)
+  completedAt   DateTime?
+  claimedAt     DateTime?
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+  @@index([achievementId])
+}
+
+model Leaderboard {
+  id        String   @id @default(cuid())
+  name      String
+  type      String
+  period    String
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type, period])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  type      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  metadata  Json?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([read])
+  @@index([createdAt])
+}
+
+model GameEvent {
+  id          String    @id @default(cuid())
+  name        String
+  description String
+  type        String
+  startAt     DateTime
+  endAt       DateTime
+  rules       Json
+  rewards     Json
+  enabled     Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([enabled])
+  @@index([startAt, endAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  details   Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model AdminUser {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  role      String   @default("admin")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}

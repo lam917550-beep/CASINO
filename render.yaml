@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: telegram-casino-api
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm run db:migrate && npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: casino-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: casino-redis
+          type: redis
+          property: connectionString
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_WEBAPP_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: https://your-frontend.onrender.com
+
+databases:
+  - name: casino-db
+    databaseName: casino
+    plan: free
+    ipAllowList: []
+
+  - name: casino-redis
+    plan: free
